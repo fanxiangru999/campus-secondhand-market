@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.campus.market.mapper.ProductMapper">
+
+    <resultMap id="BaseResultMap" type="com.campus.market.entity.Product">
+        <id column="id" property="id"/>
+        <result column="product_id" property="productId"/>
+        <result column="seller_student_id" property="sellerStudentId"/>
+        <result column="category" property="category"/>
+        <result column="product_name" property="productName"/>
+        <result column="condition" property="condition"/>
+        <result column="price" property="price"/>
+        <result column="description" property="description"/>
+        <result column="image_url" property="imageUrl"/>
+        <result column="publish_date" property="publishDate"/>
+        <result column="status" property="status"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="seller_username" property="sellerUsername"/>
+        <result column="seller_phone" property="sellerPhone"/>
+    </resultMap>
+
+    <select id="selectByProductId" resultMap="BaseResultMap">
+        SELECT p.*, u.username as seller_username, u.phone as seller_phone
+        FROM products p
+        LEFT JOIN users u ON p.seller_student_id = u.student_id
+        WHERE p.product_id = #{productId}
+    </select>
+
+    <insert id="insert" parameterType="com.campus.market.entity.Product">
+        INSERT INTO products (product_id, seller_student_id, category, product_name, `condition`, price, description, image_url, status)
+        VALUES (#{productId}, #{sellerStudentId}, #{category}, #{productName}, #{condition}, #{price}, #{description}, #{imageUrl}, #{status})
+    </insert>
+
+    <update id="update" parameterType="com.campus.market.entity.Product">
+        UPDATE products
+        <set>
+            <if test="price != null">price = #{price},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="imageUrl != null">image_url = #{imageUrl},</if>
+            <if test="status != null">status = #{status},</if>
+        </set>
+        WHERE product_id = #{productId}
+    </update>
+
+    <delete id="deleteByProductId">
+        DELETE FROM products WHERE product_id = #{productId}
+    </delete>
+
+    <select id="selectBySellerStudentId" resultMap="BaseResultMap">
+        SELECT p.*, u.username as seller_username, u.phone as seller_phone
+        FROM products p
+        LEFT JOIN users u ON p.seller_student_id = u.student_id
+        WHERE p.seller_student_id = #{studentId}
+        ORDER BY p.publish_date DESC
+    </select>
+
+    <select id="selectByCondition" resultMap="BaseResultMap">
+        SELECT p.*, u.username as seller_username, u.phone as seller_phone
+        FROM products p
+        LEFT JOIN users u ON p.seller_student_id = u.student_id
+        <where>
+            <if test="category != null and category != ''">
+                AND p.category = #{category}
+            </if>
+            <if test="productName != null and productName != ''">
+                AND p.product_name LIKE CONCAT('%', #{productName}, '%')
+            </if>
+            <if test="status != null and status != ''">
+                AND p.status = #{status}
+            </if>
+            <if test="sellerStudentId != null and sellerStudentId != ''">
+                AND p.seller_student_id = #{sellerStudentId}
+            </if>
+        </where>
+        ORDER BY p.publish_date DESC
+        <if test="offset != null and pageSize != null">
+            LIMIT #{offset}, #{pageSize}
+        </if>
+    </select>
+
+    <select id="countByCondition" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM products p
+        <where>
+            <if test="category != null and category != ''">
+                AND p.category = #{category}
+            </if>
+            <if test="productName != null and productName != ''">
+                AND p.product_name LIKE CONCAT('%', #{productName}, '%')
+            </if>
+            <if test="status != null and status != ''">
+                AND p.status = #{status}
+            </if>
+            <if test="sellerStudentId != null and sellerStudentId != ''">
+                AND p.seller_student_id = #{sellerStudentId}
+            </if>
+        </where>
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT p.*, u.username as seller_username, u.phone as seller_phone
+        FROM products p
+        LEFT JOIN users u ON p.seller_student_id = u.student_id
+        ORDER BY p.publish_date DESC
+    </select>
+
+    <update id="updateStatus">
+        UPDATE products SET status = #{status} WHERE product_id = #{productId}
+    </update>
+
+    <select id="countByDateRange" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM products
+        WHERE publish_date BETWEEN #{startDate} AND #{endDate}
+    </select>
+
+</mapper>

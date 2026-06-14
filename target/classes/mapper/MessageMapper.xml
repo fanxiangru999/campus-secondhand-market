@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.campus.market.mapper.MessageMapper">
+
+    <resultMap id="BaseResultMap" type="com.campus.market.entity.Message">
+        <id column="id" property="id"/>
+        <result column="message_id" property="messageId"/>
+        <result column="product_id" property="productId"/>
+        <result column="sender_student_id" property="senderStudentId"/>
+        <result column="receiver_student_id" property="receiverStudentId"/>
+        <result column="content" property="content"/>
+        <result column="parent_message_id" property="parentMessageId"/>
+        <result column="is_read" property="isRead"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="sender_username" property="senderUsername"/>
+        <result column="receiver_username" property="receiverUsername"/>
+        <result column="product_name" property="productName"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.campus.market.entity.Message">
+        INSERT INTO messages (message_id, product_id, sender_student_id, receiver_student_id, content, parent_message_id, is_read)
+        VALUES (#{messageId}, #{productId}, #{senderStudentId}, #{receiverStudentId}, #{content}, #{parentMessageId}, #{isRead})
+    </insert>
+
+    <select id="selectByMessageId" resultMap="BaseResultMap">
+        SELECT m.*,
+               s.username as sender_username,
+               r.username as receiver_username,
+               p.product_name
+        FROM messages m
+        LEFT JOIN users s ON m.sender_student_id = s.student_id
+        LEFT JOIN users r ON m.receiver_student_id = r.student_id
+        LEFT JOIN products p ON m.product_id = p.product_id
+        WHERE m.message_id = #{messageId}
+    </select>
+
+    <select id="selectByProductId" resultMap="BaseResultMap">
+        SELECT m.*,
+               s.username as sender_username,
+               r.username as receiver_username,
+               p.product_name
+        FROM messages m
+        LEFT JOIN users s ON m.sender_student_id = s.student_id
+        LEFT JOIN users r ON m.receiver_student_id = r.student_id
+        LEFT JOIN products p ON m.product_id = p.product_id
+        WHERE m.product_id = #{productId}
+        ORDER BY m.created_at ASC
+    </select>
+
+    <select id="selectByReceiver" resultMap="BaseResultMap">
+        SELECT m.*,
+               s.username as sender_username,
+               r.username as receiver_username,
+               p.product_name
+        FROM messages m
+        LEFT JOIN users s ON m.sender_student_id = s.student_id
+        LEFT JOIN users r ON m.receiver_student_id = r.student_id
+        LEFT JOIN products p ON m.product_id = p.product_id
+        WHERE m.receiver_student_id = #{receiverStudentId}
+        ORDER BY m.created_at DESC
+    </select>
+
+    <select id="selectBySender" resultMap="BaseResultMap">
+        SELECT m.*,
+               s.username as sender_username,
+               r.username as receiver_username,
+               p.product_name
+        FROM messages m
+        LEFT JOIN users s ON m.sender_student_id = s.student_id
+        LEFT JOIN users r ON m.receiver_student_id = r.student_id
+        LEFT JOIN products p ON m.product_id = p.product_id
+        WHERE m.sender_student_id = #{senderStudentId}
+        ORDER BY m.created_at DESC
+    </select>
+
+    <update id="markAsRead">
+        UPDATE messages SET is_read = 1 WHERE message_id = #{messageId}
+    </update>
+
+    <select id="countUnread" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM messages WHERE receiver_student_id = #{receiverStudentId} AND is_read = 0
+    </select>
+
+</mapper>

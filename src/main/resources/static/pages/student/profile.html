@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人中心 - 校园二手物品交易平台</title>
+    <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-content">
+            <div class="navbar-logo">校园二手市场</div>
+            <ul class="navbar-menu">
+                <li><a href="index.html">首页</a></li>
+                <li><a href="my-products.html">我的发布</a></li>
+                <li><a href="my-trades.html">我的交易</a></li>
+                <li><a href="profile.html">个人中心</a></li>
+            </ul>
+            <div class="navbar-user">
+                <span id="navUsername">加载中...</span>
+                <button class="btn btn-small btn-warning" onclick="logout()">退出</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <h3 class="card-header">个人信息</h3>
+            <form id="profileForm">
+                <div class="form-group">
+                    <label class="form-label">学号</label>
+                    <input type="text" class="form-control" id="studentId" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">用户名</label>
+                    <input type="text" class="form-control" id="username" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">用户类型</label>
+                    <input type="text" class="form-control" id="userType" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">联系电话</label>
+                    <input type="text" class="form-control" id="phone" placeholder="请输入联系电话">
+                </div>
+                <button type="submit" class="btn btn-primary">保存修改</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3 class="card-header">修改密码</h3>
+            <form id="passwordForm">
+                <div class="form-group">
+                    <label class="form-label">原密码</label>
+                    <input type="password" class="form-control" id="oldPassword" required placeholder="请输入原密码">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">新密码</label>
+                    <input type="password" class="form-control" id="newPassword" required placeholder="请输入新密码">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">确认新密码</label>
+                    <input type="password" class="form-control" id="confirmPassword" required placeholder="请再次输入新密码">
+                </div>
+                <button type="submit" class="btn btn-warning">修改密码</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h3 class="card-header">账号统计</h3>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px;">
+                <div style="text-align: center; padding: 20px; background: #f5f7fa; border-radius: 8px;">
+                    <h2 style="margin: 0; color: #409eff;" id="productCount">0</h2>
+                    <p style="margin: 10px 0 0 0; color: #606266;">发布物品数</p>
+                </div>
+                <div style="text-align: center; padding: 20px; background: #f5f7fa; border-radius: 8px;">
+                    <h2 style="margin: 0; color: #67c23a;" id="sellCount">0</h2>
+                    <p style="margin: 10px 0 0 0; color: #606266;">卖出数量</p>
+                </div>
+                <div style="text-align: center; padding: 20px; background: #f5f7fa; border-radius: 8px;">
+                    <h2 style="margin: 0; color: #e6a23c;" id="buyCount">0</h2>
+                    <p style="margin: 10px 0 0 0; color: #606266;">买入数量</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../js/api.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script>
+        checkLogin();
+
+        async function initPage() {
+            await loadUserInfo();
+            await loadStatistics();
+        }
+
+        async function loadUserInfo() {
+            try {
+                const response = await api.user.getInfo();
+                if (response.code === 200) {
+                    const user = response.data;
+                    // 更新导航栏用户名
+                    document.getElementById('navUsername').textContent = user.username;
+                    // 更新表单字段
+                    document.getElementById('studentId').value = user.studentId;
+                    document.getElementById('username').value = user.username;
+                    document.getElementById('userType').value = user.userType === 'admin' ? '管理员' : '学生';
+                    document.getElementById('phone').value = user.phone || '';
+                } else {
+                    showError(response.message || '加载失败');
+                }
+            } catch (error) {
+                console.error('Load user info error:', error);
+                showError('加载失败，请检查网络连接');
+            }
+        }
+
+        async function loadStatistics() {
+            try {
+                const [productsRes, tradesRes] = await Promise.all([
+                    api.product.getMyProducts(),
+                    api.trade.getMyTrades()
+                ]);
+
+                if (productsRes.code === 200) {
+                    document.getElementById('productCount').textContent = productsRes.data.length;
+                }
+
+                if (tradesRes.code === 200) {
+                    const userInfo = getUserInfo();
+                    const trades = tradesRes.data.filter(t => t.tradeStatus === '已完成');
+                    const sellCount = trades.filter(t => t.sellerStudentId === userInfo.studentId).length;
+                    const buyCount = trades.filter(t => t.buyerStudentId === userInfo.studentId).length;
+
+                    document.getElementById('sellCount').textContent = sellCount;
+                    document.getElementById('buyCount').textContent = buyCount;
+                }
+            } catch (error) {
+                console.error('Load statistics error:', error);
+            }
+        }
+
+        document.getElementById('profileForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const phone = document.getElementById('phone').value;
+
+            try {
+                const response = await api.user.update({ phone: phone });
+                if (response.code === 200) {
+                    showSuccess('修改成功！');
+
+                    // 更新本地存储的用户信息
+                    const userInfo = getUserInfo();
+                    userInfo.phone = phone;
+                    saveUserInfo(userInfo);
+                } else {
+                    showError(response.message || '修改失败');
+                }
+            } catch (error) {
+                console.error('Update error:', error);
+                showError('修改失败，请检查网络连接');
+            }
+        });
+
+        document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const oldPassword = document.getElementById('oldPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (newPassword !== confirmPassword) {
+                showError('两次输入的新密码不一致');
+                return;
+            }
+
+            if (newPassword.length < 6) {
+                showError('新密码长度不能少于6位');
+                return;
+            }
+
+            try {
+                const response = await api.user.updatePassword({
+                    oldPassword: oldPassword,
+                    newPassword: newPassword
+                });
+
+                if (response.code === 200) {
+                    showSuccess('密码修改成功！请重新登录');
+                    setTimeout(() => {
+                        logout();
+                    }, 1500);
+                } else {
+                    showError(response.message || '修改失败');
+                }
+            } catch (error) {
+                console.error('Update password error:', error);
+                showError('修改失败，请检查网络连接');
+            }
+        });
+
+        initPage();
+    </script>
+</body>
+</html>

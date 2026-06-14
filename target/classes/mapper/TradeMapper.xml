@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.campus.market.mapper.TradeMapper">
+
+    <resultMap id="BaseResultMap" type="com.campus.market.entity.Trade">
+        <id column="id" property="id"/>
+        <result column="trade_id" property="tradeId"/>
+        <result column="seller_student_id" property="sellerStudentId"/>
+        <result column="buyer_student_id" property="buyerStudentId"/>
+        <result column="product_id" property="productId"/>
+        <result column="trade_price" property="tradePrice"/>
+        <result column="trade_date" property="tradeDate"/>
+        <result column="trade_status" property="tradeStatus"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="seller_username" property="sellerUsername"/>
+        <result column="buyer_username" property="buyerUsername"/>
+        <result column="product_name" property="productName"/>
+        <result column="category" property="category"/>
+    </resultMap>
+
+    <select id="selectByTradeId" resultMap="BaseResultMap">
+        SELECT t.*,
+               s.username as seller_username,
+               b.username as buyer_username,
+               p.product_name,
+               p.category
+        FROM trades t
+        LEFT JOIN users s ON t.seller_student_id = s.student_id
+        LEFT JOIN users b ON t.buyer_student_id = b.student_id
+        LEFT JOIN products p ON t.product_id = p.product_id
+        WHERE t.trade_id = #{tradeId}
+    </select>
+
+    <insert id="insert" parameterType="com.campus.market.entity.Trade">
+        INSERT INTO trades (trade_id, seller_student_id, buyer_student_id, product_id, trade_price, trade_status)
+        VALUES (#{tradeId}, #{sellerStudentId}, #{buyerStudentId}, #{productId}, #{tradePrice}, #{tradeStatus})
+    </insert>
+
+    <update id="updateStatus">
+        UPDATE trades SET trade_status = #{status} WHERE trade_id = #{tradeId}
+    </update>
+
+    <select id="selectByStudentId" resultMap="BaseResultMap">
+        SELECT t.*,
+               s.username as seller_username,
+               b.username as buyer_username,
+               p.product_name,
+               p.category
+        FROM trades t
+        LEFT JOIN users s ON t.seller_student_id = s.student_id
+        LEFT JOIN users b ON t.buyer_student_id = b.student_id
+        LEFT JOIN products p ON t.product_id = p.product_id
+        WHERE t.seller_student_id = #{studentId} OR t.buyer_student_id = #{studentId}
+        ORDER BY t.trade_date DESC
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT t.*,
+               s.username as seller_username,
+               b.username as buyer_username,
+               p.product_name,
+               p.category
+        FROM trades t
+        LEFT JOIN users s ON t.seller_student_id = s.student_id
+        LEFT JOIN users b ON t.buyer_student_id = b.student_id
+        LEFT JOIN products p ON t.product_id = p.product_id
+        ORDER BY t.trade_date DESC
+    </select>
+
+    <select id="selectByCondition" resultMap="BaseResultMap">
+        SELECT t.*,
+               s.username as seller_username,
+               b.username as buyer_username,
+               p.product_name,
+               p.category
+        FROM trades t
+        LEFT JOIN users s ON t.seller_student_id = s.student_id
+        LEFT JOIN users b ON t.buyer_student_id = b.student_id
+        LEFT JOIN products p ON t.product_id = p.product_id
+        <where>
+            <if test="studentId != null and studentId != ''">
+                AND (t.seller_student_id = #{studentId} OR t.buyer_student_id = #{studentId})
+            </if>
+            <if test="startDate != null and startDate != ''">
+                AND t.trade_date &gt;= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND t.trade_date &lt;= #{endDate}
+            </if>
+            <if test="tradeStatus != null and tradeStatus != ''">
+                AND t.trade_status = #{tradeStatus}
+            </if>
+        </where>
+        ORDER BY t.trade_date DESC
+        <if test="offset != null and pageSize != null">
+            LIMIT #{offset}, #{pageSize}
+        </if>
+    </select>
+
+    <select id="countByCondition" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM trades t
+        <where>
+            <if test="studentId != null and studentId != ''">
+                AND (t.seller_student_id = #{studentId} OR t.buyer_student_id = #{studentId})
+            </if>
+            <if test="startDate != null and startDate != ''">
+                AND t.trade_date &gt;= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND t.trade_date &lt;= #{endDate}
+            </if>
+            <if test="tradeStatus != null and tradeStatus != ''">
+                AND t.trade_status = #{tradeStatus}
+            </if>
+        </where>
+    </select>
+
+    <select id="countByDateRange" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM trades
+        WHERE trade_status = '已完成'
+          AND trade_date BETWEEN #{startDate} AND #{endDate}
+    </select>
+
+    <select id="countByCategory" resultType="java.util.HashMap">
+        SELECT p.category, COUNT(*) as count
+        FROM trades t
+        LEFT JOIN products p ON t.product_id = p.product_id
+        WHERE t.trade_status = '已完成'
+        <if test="startDate != null and endDate != null">
+            AND t.trade_date BETWEEN #{startDate} AND #{endDate}
+        </if>
+        GROUP BY p.category
+        ORDER BY count DESC
+    </select>
+
+</mapper>

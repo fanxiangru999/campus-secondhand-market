@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>统计分析 - 校园二手物品交易平台</title>
+    <link rel="stylesheet" href="../../css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-content">
+            <div class="navbar-logo">管理员后台</div>
+            <ul class="navbar-menu">
+                <li><a href="index.html">首页</a></li>
+                <li><a href="users.html">用户管理</a></li>
+                <li><a href="products.html">物品管理</a></li>
+                <li><a href="trades.html">交易管理</a></li>
+                <li><a href="statistics.html">统计分析</a></li>
+            </ul>
+            <div class="navbar-user">
+                <span id="username">管理员</span>
+                <button class="btn btn-small btn-warning" onclick="logout()">退出</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <h3 class="card-header">统计分析</h3>
+            <div class="toolbar">
+                <div class="search-box">
+                    <label>开始日期：</label>
+                    <input type="date" class="form-control" id="startDate" style="width: 160px;">
+                    <label>结束日期：</label>
+                    <input type="date" class="form-control" id="endDate" style="width: 160px;">
+                    <button class="btn btn-primary" onclick="loadStatistics()">查询统计</button>
+                    <button class="btn btn-info" onclick="setThisMonth()">本月</button>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <h4>统计概览</h4>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px;">
+                    <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                        <h3 style="margin: 0; font-size: 36px;" id="productCount">0</h3>
+                        <p style="margin: 10px 0 0 0;">物品发布数量</p>
+                    </div>
+                    <div class="card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                        <h3 style="margin: 0; font-size: 36px;" id="tradeCount">0</h3>
+                        <p style="margin: 10px 0 0 0;">交易完成数量</p>
+                    </div>
+                    <div class="card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+                        <h3 style="margin: 0; font-size: 36px;" id="tradeAmount">¥0</h3>
+                        <p style="margin: 10px 0 0 0;">交易总金额</p>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px;">
+                <h4>热门交易分类</h4>
+                <div id="categoryStats"></div>
+            </div>
+
+            <div style="margin-top: 30px;">
+                <h4>高价交易记录（≥500元）</h4>
+                <div id="highPriceTrades"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../js/api.js"></script>
+    <script src="../../js/utils.js"></script>
+    <script>
+        checkLogin();
+
+        async function initPage() {
+            if (!isAdmin()) {
+                showError('无权限访问');
+                setTimeout(() => window.location.href = '/login.html', 1500);
+                return;
+            }
+
+            const userInfo = getUserInfo();
+            document.getElementById('username').textContent = userInfo.username;
+
+            // 设置默认日期为本月
+            setThisMonth();
+            await loadStatistics();
+        }
+
+        function setThisMonth() {
+            const now = new Date();
+            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+            const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+            document.getElementById('startDate').value = firstDay.toISOString().split('T')[0];
+            document.getElementById('endDate').value = lastDay.toISOString().split('T')[0];
+        }
+
+        async function loadStatistics() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            if (!startDate || !endDate) {
+                showError('请选择开始日期和结束日期');
+                return;
+            }
+
+            try {
+                const response = await api.statistics.getSummary({
+                    startDate: startDate,
+                    endDate: endDate
+                });
+
+                if (response.code === 200) {
+                    const data = response.data;
+
+                    // 显示统计概览
+                    document.getElementById('productCount').textContent = data.productCount || 0;
+                    document.getElementById('tradeCount').textContent = data.tradeCount || 0;
+
+                    // 计算交易总金额
+                    const trades = await api.trade.getAll();
+                    if (trades.code === 200) {
+                        const filteredTrades = trades.data.filter(t => {
+                            const tradeDate = new Date(t.tradeDate);
+                            return tradeDate >= new Date(startDate) &&
+                                   tradeDate <= new Date(endDate + ' 23:59:59') &&
+                                   t.tradeStatus === '已完成';
+                        });
+                        const totalAmount = filteredTrades.reduce((sum, t) => sum + parseFloat(t.tradePrice), 0);
+                        document.getElementById('tradeAmount').textContent = formatPrice(totalAmount);
+
+                        // 显示高价交易
+                        const highPriceTrades = filteredTrades.filter(t => t.tradePrice >= 500);
+                        displayHighPriceTrades(highPriceTrades);
+                    }
+
+                    // 显示分类统计
+                    displayCategoryStats(data.categoryStats || []);
+                } else {
+                    showError(response.message || '加载失败');
+                }
+            } catch (error) {
+                console.error('Load statistics error:', error);
+                showError('加载失败，请检查网络连接');
+            }
+        }
+
+        function displayCategoryStats(stats) {
+            if (stats.length === 0) {
+                document.getElementById('categoryStats').innerHTML = '<p style="text-align: center; color: #909399;">暂无数据</p>';
+                return;
+            }
+
+            const html = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>排名</th>
+                            <th>分类</th>
+                            <th>交易次数</th>
+                            <th>占比</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${stats.map((stat, index) => {
+                            const total = stats.reduce((sum, s) => sum + parseInt(s.count), 0);
+                            const percentage = ((parseInt(stat.count) / total) * 100).toFixed(1);
+                            return `
+                                <tr>
+                                    <td>${index + 1}</td>
+                                    <td>${stat.category || '其他'}</td>
+                                    <td>${stat.count}</td>
+                                    <td>
+                                        <div style="display: flex; align-items: center; gap: 10px;">
+                                            <div style="flex: 1; background: #f5f7fa; border-radius: 4px; height: 20px; overflow: hidden;">
+                                                <div style="background: #409eff; height: 100%; width: ${percentage}%;"></div>
+                                            </div>
+                                            <span>${percentage}%</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+            document.getElementById('categoryStats').innerHTML = html;
+        }
+
+        function displayHighPriceTrades(trades) {
+            if (trades.length === 0) {
+                document.getElementById('highPriceTrades').innerHTML = '<p style="text-align: center; color: #909399;">暂无高价交易记录</p>';
+                return;
+            }
+
+            const html = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>交易编号</th>
+                            <th>物品名称</th>
+                            <th>卖家</th>
+                            <th>买家</th>
+                            <th>成交价格</th>
+                            <th>交易时间</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${trades.map(trade => `
+                            <tr>
+                                <td>${trade.tradeId}</td>
+                                <td>${trade.productName}</td>
+                                <td>${trade.sellerUsername}</td>
+                                <td>${trade.buyerUsername}</td>
+                                <td class="price-high">${formatPrice(trade.tradePrice)}</td>
+                                <td>${formatDate(trade.tradeDate)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            document.getElementById('highPriceTrades').innerHTML = html;
+        }
+
+        initPage();
+    </script>
+</body>
+</html>
